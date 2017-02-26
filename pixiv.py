@@ -1,12 +1,26 @@
 '''
-pixiv downloader by Foair
+pixiv getaddrer by Foair
 主页：https://foair.com/
 TODO：填补登录认证和输入验证等逻辑、下载动图、更多爬取的内容、加入异常处理提升稳定性、使用 cookie 登录、立即写入日志、更详细的日志记录……
 TODO：指定文件夹下载、使用多线程处理、导出链接以便使用迅雷下载、简化代码提升效率……
 '''
 import re
+
 import requests
 from bs4 import BeautifulSoup
+
+# pixiv 图集原图网页地址
+# http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id=<id>&page=0
+# <img alt="君は月夜に光り輝く" width="1500" height="1100" data-src="http://i2.pixiv.net/img-original/img/2017/02/24/00/21/47/61606801_p0.png" class="original-image">
+
+# pixiv 图集数量网页地址
+# http://www.pixiv.net/member_illust.php?mode=manga&illust_id=<id>
+# <span class="total">7</span>
+
+# pixiv 单幅原图网页地址
+# http://www.pixiv.net/member_illust.php?mode=medium&illust_id=<id>
+# <body><img src="http://i4.pixiv.net/img-original/img/2017/02/24/13/54/08/61612383_p2.png" onclick="(window.open('', '_self')).close()"></body>
+
 
 def login(account, pwd):
     '''登录 pixiv，并返回一个 session'''
@@ -30,6 +44,7 @@ AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36',
     session.post(loginapi, data=data, headers=head)
     return session
 
+
 def getinfo(art):
     '''获取作品详细信息和原图所在网页地址'''
     date = art['data-date']
@@ -52,20 +67,37 @@ def getinfo(art):
                     user, '\t', view, '\t', link, '\t', tag, '\t', arttype, '\t', ulink, '\t'])
     LOG.flush()
     style = 1
-    return link, style
+    return artid, style
 
-def download(link, style=1):
+
+def getaddr(artid, style=1):
     '''传入一个原图所在的网页地址和原图网页地址的类型，然后下载图片'''
-    head_img = {'Referer': link, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
-AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36'}
-    img = S.get(link, headers=HEADON)
+    # 根据类型选择网页地址
     if style == 1:
-        hiimg = BeautifulSoup(img.text, 'lxml')
+        link = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' + artid
+    elif style == 2:
+        link = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' + artid
+    else:
+        print('暂时不支持此类下载！')
+        exit()
+
+    img = S.get(link, headers=HEADON)
+    hiimg = BeautifulSoup(img.text, 'lxml')
+
+    # 对网页内容进行相应的解析
+    if style == 1:
         temp = hiimg.body.find(id='wrapper').find(class_='wrapper')
+        src = temp.find('img')['data-src']
     elif style == 2:
         print('这是一个画集，马上就可以下载！')
-        # LOG.writelines('这是一个画集，暂时无法下载！\n')
-        return
+        count = hiimg.body.find(class_='total').text
+        imglink = 'http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id=' + artid + '&page=0'
+        imgimg = BeautifulSoup(S.get(imglink, headers=HEADON).text, 'lxml')
+        # print(imgimg.text)
+        srcori = imgimg.body.img['src']
+        for i in range(0, int(count)):
+            src = re.sub(r'_p\d(\..+)$', r'_p' + str(i) + r'\1', srcori)
+            download(src, link)
         # print('>>>', temp)
     elif style == 3:
         print('这是一个动图，暂时无法下载！')
@@ -73,13 +105,17 @@ AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36'}
         return
     else:
         print('不认识的类型！')
-    src = temp.find('img')['data-src']
-    print(src)
-    new = S.get(src, headers=head_img)
-    pic = open(src.split('/')[-1], 'wb')
+        exit()
+
+def download(addr, link):
+    print(addr)
+    head_img = {'Referer': link, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
+AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36'}
+    new = S.get(addr, headers=head_img)
+    pic = open(addr.split('/')[-1], 'wb')
     pic.write(new.content)
     print('下载完成！')
-    LOG.writelines('下载完成！\n')
+    LOG.writelines(addr + '\n下载完成！\n')
     pic.close()
 
 def getother(num):
@@ -89,7 +125,7 @@ def getother(num):
         haha = S.get(other, headers=HEADON)
         soup = BeautifulSoup(haha.text, 'lxml')
         for art in soup.find_all(class_='_work'):
-            download('http://www.pixiv.net/' + art['href'], 1)
+            getaddr('http://www.pixiv.net/' + art['href'], 1)
 
 DAILY = 'http://www.pixiv.net/ranking.php?mode=daily'
 WEEKLY = 'http://www.pixiv.net/ranking.php?mode=weekly'
@@ -99,6 +135,7 @@ MALE = 'http://www.pixiv.net/ranking.php?mode=male'
 ILLUST_DAILY = 'http://www.pixiv.net/ranking.php?mode=daily&content=illust'
 ILLUST_WEEKLY = 'http://www.pixiv.net/ranking.php?mode=weekly&content=illust'
 ILLUST_MONTHLY = 'http://www.pixiv.net/ranking.php?mode=monthly&content=illust'
+
 
 print('1. 下载「综合今日排行榜」')
 print('2. 下载「综合本周排行榜」')
@@ -143,14 +180,17 @@ print('正在登录中……')
 S = login(ACCOUNT, PWD)
 print('登录成功！')
 
-# 打开日志文件以便写入
-LOG = open('pixiv.log', 'w', encoding='utf-8')
-
 # 根据选项获取网页内容
 HEADON = {'Host': 'www.pixiv.net',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36',
           'Referer': 'http://www.pixiv.net/', 'Accept-Language': 'zh-CN,zh;q=0.8'}
+
+getaddr('61612383', 2)
+pass
+# 打开日志文件以便写入
+LOG = open('pixiv.log', 'w', encoding='utf-8')
+
 
 HAHA = S.get(WANT, headers=HEADON)
 # print(HAHA.text)
@@ -161,13 +201,13 @@ SOUP = BeautifulSoup(HAHA.text, 'lxml')
 
 if CHOICE != '9':
     for ART in SOUP.find_all(id=re.compile(r'\d')):
-        print(ART)
-        input('dd')
+        # print(ART)
+        # input('dd')
         info = getinfo(ART)
-        download(info[0], 1)
+        getaddr(info[0], 1)
 else:
     for ART in SOUP.find_all(class_='_work'):
-        download('http://www.pixiv.net/' + ART['href'])
+        getaddr('http://www.pixiv.net/' + ART['href'])
     getother(int(SOUP.find(class_='count-badge').text.rstrip('件')) // 20 + 2)
 
 # 关闭日志文件
