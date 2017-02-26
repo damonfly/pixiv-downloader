@@ -72,7 +72,9 @@ AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36',
     return session
 
 ACCOUNT = input('请输入 ID 或邮箱：')
+ACCOUNT = 'daody@qq.com'
 PWD = input('请输入密码：')
+PWD = '4yVyUUAJhhudrE'
 print('正在登录中……')
 S = login(ACCOUNT, PWD)
 print('登录成功！')
