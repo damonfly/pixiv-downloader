@@ -9,19 +9,6 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-# pixiv 图集原图网页地址
-# http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id=<id>&page=0
-# <img alt="君は月夜に光り輝く" width="1500" height="1100" data-src="http://i2.pixiv.net/img-original/img/2017/02/24/00/21/47/61606801_p0.png" class="original-image">
-
-# pixiv 图集数量网页地址
-# http://www.pixiv.net/member_illust.php?mode=manga&illust_id=<id>
-# <span class="total">7</span>
-
-# pixiv 单幅原图网页地址
-# http://www.pixiv.net/member_illust.php?mode=medium&illust_id=<id>
-# <body><img src="http://i4.pixiv.net/img-original/img/2017/02/24/13/54/08/61612383_p2.png" onclick="(window.open('', '_self')).close()"></body>
-
-
 def login(account, pwd):
     '''登录 pixiv，并返回一个 session'''
     loginaddr = 'https://accounts.pixiv.net/login?\
@@ -47,6 +34,10 @@ AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36',
 
 def getinfo(art):
     '''获取作品详细信息和原图所在网页地址'''
+    if art.find(class_='ranking-image-item').a['class'][2] == '':
+        style = 1
+    else:
+        style = 2
     date = art['data-date']
     artid = art['data-id']
     rank = art['data-rank']
@@ -66,7 +57,7 @@ def getinfo(art):
     LOG.writelines([date, '\t', artid, '\t', rank, '\t', title, '\t', score, '\t',
                     user, '\t', view, '\t', link, '\t', tag, '\t', arttype, '\t', ulink, '\t'])
     LOG.flush()
-    style = 1
+    # style = 1
     return artid, style
 
 
@@ -88,10 +79,12 @@ def getaddr(artid, style=1):
     if style == 1:
         temp = hiimg.body.find(id='wrapper').find(class_='wrapper')
         src = temp.find('img')['data-src']
+        download(src, link)
     elif style == 2:
-        print('这是一个画集，马上就可以下载！')
+        print('这是一个画集，现在正在下载……')
         count = hiimg.body.find(class_='total').text
-        imglink = 'http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id=' + artid + '&page=0'
+        imglink = 'http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id=' + \
+            artid + '&page=0'
         imgimg = BeautifulSoup(S.get(imglink, headers=HEADON).text, 'lxml')
         # print(imgimg.text)
         srcori = imgimg.body.img['src']
@@ -107,7 +100,9 @@ def getaddr(artid, style=1):
         print('不认识的类型！')
         exit()
 
+
 def download(addr, link):
+    '''根据图片地址和参考链接下载图片'''
     print(addr)
     head_img = {'Referer': link, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36'}
@@ -117,6 +112,7 @@ AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36'}
     print('下载完成！')
     LOG.writelines(addr + '\n下载完成！\n')
     pic.close()
+
 
 def getother(num):
     '''获得画师其他页面的下载'''
@@ -186,8 +182,8 @@ HEADON = {'Host': 'www.pixiv.net',
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.103 Safari/537.36',
           'Referer': 'http://www.pixiv.net/', 'Accept-Language': 'zh-CN,zh;q=0.8'}
 
-getaddr('61612383', 2)
-pass
+# getaddr('61612383', 2)
+# pass
 # 打开日志文件以便写入
 LOG = open('pixiv.log', 'w', encoding='utf-8')
 
@@ -204,7 +200,7 @@ if CHOICE != '9':
         # print(ART)
         # input('dd')
         info = getinfo(ART)
-        getaddr(info[0], 1)
+        getaddr(info[0], info[1])
 else:
     for ART in SOUP.find_all(class_='_work'):
         getaddr('http://www.pixiv.net/' + ART['href'])
