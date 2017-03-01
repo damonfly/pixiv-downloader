@@ -166,10 +166,8 @@ elif CHOICE == '9':
         input('请输入要查询的画师 ID：')
 
 # 填写登录信息
-# ACCOUNT = input('请输入 ID 或邮箱：')
-ACCOUNT = 'daody@qq.com'
-# PWD = input('请输入密码：')
-PWD = '4yVyUUAJhhudrE'
+ACCOUNT = input('请输入 ID 或邮箱：')
+PWD = input('请输入密码：')
 print('正在登录中……')
 
 # 判断登录是否成功
